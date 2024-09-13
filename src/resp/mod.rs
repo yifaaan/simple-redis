@@ -3,10 +3,24 @@ mod encode;
 
 use bytes::BytesMut;
 use enum_dispatch::enum_dispatch;
-use std::collections::{BTreeSet, HashMap};
+use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
+use thiserror::Error;
+
+#[derive(Error, Debug, PartialEq)]
+pub enum RespError {
+    #[error("Invalid frame: {0}")]
+    InvalidFrame(String),
+    #[error("Invalid frame type: {0}")]
+    InvalidFrameType(String),
+    #[error("Invalid frame length: {0}")]
+    InvalidFrameLength(usize),
+    #[error("Frame is not complete")]
+    NotComplete,
+}
 
 #[enum_dispatch(RespEncode)]
+#[derive(PartialEq, Debug)]
 pub enum RespFrame {
     SimpleSting(SimpleString),
     Error(SimpleError),
@@ -22,6 +36,7 @@ pub enum RespFrame {
     Set(RespSet),
 }
 
+#[derive(PartialEq, Debug)]
 pub struct SimpleString(String);
 
 impl Deref for SimpleString {
@@ -31,6 +46,7 @@ impl Deref for SimpleString {
     }
 }
 
+#[derive(PartialEq, Debug)]
 pub struct SimpleError(String);
 
 impl Deref for SimpleError {
@@ -39,6 +55,7 @@ impl Deref for SimpleError {
         &self.0
     }
 }
+#[derive(PartialEq, Debug)]
 pub struct BulkString(Vec<u8>);
 
 impl Deref for BulkString {
@@ -47,6 +64,8 @@ impl Deref for BulkString {
         &self.0
     }
 }
+
+#[derive(PartialEq, Debug)]
 pub struct RespArray(Vec<RespFrame>);
 
 impl Deref for RespArray {
@@ -56,6 +75,7 @@ impl Deref for RespArray {
     }
 }
 
+#[derive(PartialEq, Debug)]
 pub struct RespMap(HashMap<String, RespFrame>);
 
 impl Deref for RespMap {
@@ -71,6 +91,7 @@ impl DerefMut for RespMap {
     }
 }
 
+#[derive(PartialEq, Debug)]
 pub struct RespSet(Vec<RespFrame>);
 
 impl Deref for RespSet {
@@ -79,12 +100,21 @@ impl Deref for RespSet {
         &self.0
     }
 }
+#[derive(PartialEq, Debug)]
 pub struct RespNull;
+
+#[derive(PartialEq, Debug)]
 pub struct RespNullArray;
+
+#[derive(PartialEq, Debug)]
 pub struct RespNullBulkString;
 
 pub trait RespEncode {
     fn encode(self) -> Vec<u8>;
+}
+
+pub trait RespDecode: Sized {
+    fn decode(buf: &mut BytesMut) -> Result<Self, RespError>;
 }
 
 impl From<SimpleString> for RespFrame {
@@ -150,13 +180,9 @@ impl From<RespSet> for RespFrame {
         Self::Set(value)
     }
 }
-#[enum_dispatch]
-pub trait RespDecode {
-    fn decode(buf: Self) -> Result<RespFrame, String>;
-}
 
-impl RespDecode for BytesMut {
-    fn decode(buf: Self) -> Result<RespFrame, String> {
-        todo!()
-    }
-}
+// impl RespDecode for BytesMut {
+//     fn decode(buf: Self) -> Result<Option<RespFrame>, RespError> {
+//         todo!()
+//     }
+// }
