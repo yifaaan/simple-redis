@@ -1,5 +1,3 @@
-use std::fmt::format;
-
 use super::BulkString;
 use super::RespArray;
 use super::RespEncode;
@@ -16,7 +14,20 @@ const BUF_CAP: usize = 4096;
 
 impl RespEncode for RespFrame {
     fn encode(self) -> Vec<u8> {
-        todo!()
+        match self {
+            Self::SimpleSting(s) => s.encode(),
+            Self::Array(arr) => arr.encode(),
+            Self::Boolean(b) => b.encode(),
+            Self::BulkString(s) => s.encode(),
+            Self::Double(d) => d.encode(),
+            Self::Error(e) => e.encode(),
+            Self::Integer(i) => i.encode(),
+            Self::Map(m) => m.encode(),
+            Self::Null(n) => n.encode(),
+            Self::NullArray(n) => n.encode(),
+            Self::NullBulkString(n) => n.encode(),
+            Self::Set(s) => s.encode(),
+        }
     }
 }
 
@@ -82,7 +93,7 @@ impl RespEncode for RespArray {
 impl RespEncode for i64 {
     fn encode(self) -> Vec<u8> {
         let sign = if self < 0 { "-" } else { "+" };
-        format!(":{}{}\r\n", sign, self).into_bytes()
+        format!(":{}{}\r\n", sign, self.abs()).into_bytes()
     }
 }
 
@@ -96,11 +107,11 @@ impl RespEncode for bool {
 // - double: ",[<+|->]<integral>[.<fractional>][<E|e>[sign]<exponent>]\r\n"
 impl RespEncode for f64 {
     fn encode(self) -> Vec<u8> {
-        let res = if self.abs() > 1e+8 {
+        let res = if self.abs() > 1e+8 || self.abs() < 1e-8 {
             format!(",{:+e}\r\n", self)
         } else {
-            let sign = if self < 0.0 { "" } else { "+" };
-            format!(",{}{}\r\n", sign, self)
+            let sign = if self < 0.0 { "-" } else { "+" };
+            format!(",{}{}\r\n", sign, self.abs())
         };
         res.into_bytes()
     }
@@ -128,5 +139,121 @@ impl RespEncode for RespSet {
             buf.extend_from_slice(&value.encode());
         }
         buf
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use super::*;
+
+    #[test]
+    fn test_simple_string_encode() {
+        let frame: RespFrame = SimpleString("OK".into()).into();
+        assert_eq!(frame.encode(), b"+OK\r\n");
+    }
+
+    #[test]
+    fn test_integer_encode() {
+        let frame: RespFrame = 123.into();
+        assert_eq!(frame.encode(), b":+123\r\n");
+
+        let frame: RespFrame = (-123).into();
+        assert_eq!(frame.encode(), b":-123\r\n");
+    }
+
+    #[test]
+    fn test_bulk_string_encode() {
+        let frame: RespFrame = BulkString(b"hello".to_vec()).into();
+        assert_eq!(frame.encode(), b"$5\r\nhello\r\n");
+    }
+
+    #[test]
+    fn test_null_bulk_string_encode() {
+        let frame: RespFrame = RespNullBulkString.into();
+        assert_eq!(frame.encode(), b"$-1\r\n");
+    }
+
+    #[test]
+    fn test_array_encode() {
+        let frame: RespFrame = RespArray(vec![
+            BulkString("set".into()).into(),
+            BulkString("hello".into()).into(),
+            BulkString("world".into()).into(),
+        ])
+        .into();
+
+        assert_eq!(
+            frame.encode(),
+            b"*3\r\n$3\r\nset\r\n$5\r\nhello\r\n$5\r\nworld\r\n"
+        );
+    }
+
+    #[test]
+    fn test_null_array_encode() {
+        let frame: RespFrame = RespNullArray.into();
+        assert_eq!(frame.encode(), b"*-1\r\n");
+    }
+
+    #[test]
+    fn test_null_encode() {
+        let frame: RespFrame = RespNull.into();
+        assert_eq!(frame.encode(), b"_\r\n");
+    }
+
+    #[test]
+    fn test_boolean_encode() {
+        let frame: RespFrame = true.into();
+        assert_eq!(frame.encode(), b"#t\r\n");
+
+        let frame: RespFrame = false.into();
+        assert_eq!(frame.encode(), b"#f\r\n");
+    }
+
+    #[test]
+    fn test_double_encode() {
+        let frame: RespFrame = 123.456.into();
+        assert_eq!(frame.encode(), b",+123.456\r\n");
+
+        let frame: RespFrame = (-123.456).into();
+        assert_eq!(frame.encode(), b",-123.456\r\n");
+
+        let frame: RespFrame = 1.23456e+8.into();
+        // println!("{}", String::from_utf8_lossy(&frame.encode()));
+        assert_eq!(frame.encode(), b",+1.23456e8\r\n");
+
+        let frame: RespFrame = (-1.23456e-9).into();
+        // println!("{}", String::from_utf8_lossy(&frame.encode()));
+        assert_eq!(frame.encode(), b",-1.23456e-9\r\n");
+    }
+
+    #[test]
+    fn test_map_encode() {
+        let mut map = RespMap(HashMap::new());
+        map.insert("hello".into(), BulkString("world".into()).into());
+
+        map.insert("foo".into(), (-123456.789).into());
+
+        let frame: RespFrame = map.into();
+        // println!("{:?}", String::from_utf8_lossy(&frame.encode()));
+        assert_eq!(
+            frame.encode(),
+            // b"%2\r\n+hello\r\n$5\r\nworld\r\n+foo\r\n,-123456.789\r\n"
+            b"%2\r\n+foo\r\n,-123456.789\r\n+hello\r\n$5\r\nworld\r\n"
+        );
+    }
+
+    #[test]
+    fn test_set_encode() {
+        let frame: RespFrame = RespSet(vec![
+            RespArray(vec![1234.into(), true.into()]).into(),
+            BulkString("world".to_string().into()).into(),
+        ])
+        .into();
+        assert_eq!(
+            frame.encode(),
+            b"~2\r\n*2\r\n:+1234\r\n#t\r\n$5\r\nworld\r\n"
+        );
     }
 }
