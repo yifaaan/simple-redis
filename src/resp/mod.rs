@@ -17,6 +17,10 @@ pub enum RespError {
     InvalidFrameLength(usize),
     #[error("Frame is not complete")]
     NotComplete,
+    #[error("Parse erro: {0}")]
+    ParseIntError(#[from] std::num::ParseIntError),
+    #[error("Utf8 error: {0}")]
+    Utf8Error(#[from] std::num::ParseFloatError),
 }
 
 #[enum_dispatch(RespEncode)]
@@ -114,7 +118,9 @@ pub trait RespEncode {
 }
 
 pub trait RespDecode: Sized {
+    const PREFIX: &'static str;
     fn decode(buf: &mut BytesMut) -> Result<Self, RespError>;
+    fn expect_length(buf: &[u8]) -> Result<usize, RespError>;
 }
 
 impl From<SimpleString> for RespFrame {

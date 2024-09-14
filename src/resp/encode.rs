@@ -12,6 +12,19 @@ use super::SimpleString;
 
 const BUF_CAP: usize = 4096;
 
+// - SimpleString: "+OK\r\n"
+// - err: "-Error message\r\n"
+// - bulk string: "$<length>\r\n<data>\r\n"
+// - null bulk string: "$-1\r\n"
+// - null: "_\r\n"
+// - null array: "*-1\r\n"
+// - array: "*<number-of-elements>\r\n<element-1>...<element-n>"
+// - integer: ":[<+|->]<value>\r\n"
+// - boolean: "#<t|f>\r\n"
+// - double: ",[<+|->]<integral>[.<fractional>][<E|e>[sign]<exponent>]\r\n"
+// - map: "%<number-of-entries>\r\n<key-1><value-1>...<key-n><value-n>"
+// - set: "~<number-of-elements>\r\n<element-1><element-2>...<element-n>"
+
 impl RespEncode for RespFrame {
     fn encode(self) -> Vec<u8> {
         match self {
