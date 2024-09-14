@@ -17,14 +17,16 @@ pub enum RespError {
     InvalidFrameLength(usize),
     #[error("Frame is not complete")]
     NotComplete,
-    #[error("Parse erro: {0}")]
+    #[error("Parse error: {0}")]
     ParseIntError(#[from] std::num::ParseIntError),
+    #[error("Parse error: {0}")]
+    ParseFloatError(#[from] std::num::ParseFloatError),
     #[error("Utf8 error: {0}")]
-    Utf8Error(#[from] std::num::ParseFloatError),
+    Utf8Error(#[from] std::string::FromUtf8Error),
 }
 
 #[enum_dispatch(RespEncode)]
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub enum RespFrame {
     SimpleSting(SimpleString),
     Error(SimpleError),
@@ -40,8 +42,8 @@ pub enum RespFrame {
     Set(RespSet),
 }
 
-#[derive(PartialEq, Debug)]
-pub struct SimpleString(String);
+#[derive(PartialEq, Debug, Clone)]
+pub struct SimpleString(pub(crate) String);
 
 impl Deref for SimpleString {
     type Target = String;
@@ -50,8 +52,8 @@ impl Deref for SimpleString {
     }
 }
 
-#[derive(PartialEq, Debug)]
-pub struct SimpleError(String);
+#[derive(PartialEq, Debug, Clone)]
+pub struct SimpleError(pub(crate) String);
 
 impl Deref for SimpleError {
     type Target = String;
@@ -59,8 +61,8 @@ impl Deref for SimpleError {
         &self.0
     }
 }
-#[derive(PartialEq, Debug)]
-pub struct BulkString(Vec<u8>);
+#[derive(PartialEq, Debug, Clone)]
+pub struct BulkString(pub(crate) Vec<u8>);
 
 impl Deref for BulkString {
     type Target = Vec<u8>;
@@ -69,8 +71,8 @@ impl Deref for BulkString {
     }
 }
 
-#[derive(PartialEq, Debug)]
-pub struct RespArray(Vec<RespFrame>);
+#[derive(PartialEq, Debug, Clone)]
+pub struct RespArray(pub(crate) Vec<RespFrame>);
 
 impl Deref for RespArray {
     type Target = Vec<RespFrame>;
@@ -79,8 +81,8 @@ impl Deref for RespArray {
     }
 }
 
-#[derive(PartialEq, Debug)]
-pub struct RespMap(HashMap<String, RespFrame>);
+#[derive(PartialEq, Debug, Clone)]
+pub struct RespMap(pub(crate) HashMap<String, RespFrame>);
 
 impl Deref for RespMap {
     type Target = HashMap<String, RespFrame>;
@@ -95,8 +97,8 @@ impl DerefMut for RespMap {
     }
 }
 
-#[derive(PartialEq, Debug)]
-pub struct RespSet(Vec<RespFrame>);
+#[derive(PartialEq, Debug, Clone)]
+pub struct RespSet(pub(crate) Vec<RespFrame>);
 
 impl Deref for RespSet {
     type Target = Vec<RespFrame>;
@@ -104,13 +106,13 @@ impl Deref for RespSet {
         &self.0
     }
 }
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub struct RespNull;
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub struct RespNullArray;
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub struct RespNullBulkString;
 
 pub trait RespEncode {
