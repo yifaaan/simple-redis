@@ -10,8 +10,8 @@ pub struct Backend(Arc<BackendInner>);
 
 #[derive(Debug)]
 pub struct BackendInner {
-    map: DashMap<String, RespFrame>,
-    hmap: DashMap<String, DashMap<String, RespFrame>>,
+    pub map: DashMap<String, RespFrame>,
+    pub hmap: DashMap<String, DashMap<String, RespFrame>>,
 }
 
 impl Deref for Backend {

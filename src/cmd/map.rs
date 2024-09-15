@@ -1,11 +1,6 @@
-use crate::resp::{RespArray, RespFrame, RespNull, SimpleString};
-use lazy_static::lazy_static;
+use crate::resp::{RespArray, RespFrame, RespNull};
 
-use super::{extract_args, validate_command, CommandError, CommandExecutor, Get, Set};
-
-lazy_static! {
-    static ref RESP_OK: RespFrame = RespFrame::SimpleSting(SimpleString("OK".into()));
-}
+use super::{extract_args, validate_command, CommandError, CommandExecutor, Get, Set, RESP_OK};
 
 impl CommandExecutor for Get {
     fn execute(self, backend: &crate::backend::Backend) -> RespFrame {

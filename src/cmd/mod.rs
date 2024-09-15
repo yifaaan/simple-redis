@@ -2,10 +2,14 @@ mod hmap;
 mod map;
 use crate::{
     backend::Backend,
-    resp::{RespArray, RespError, RespFrame},
+    resp::{RespArray, RespError, RespFrame, SimpleString},
 };
+use lazy_static::lazy_static;
 use thiserror::Error;
 
+lazy_static! {
+    static ref RESP_OK: RespFrame = RespFrame::SimpleSting(SimpleString("OK".into()));
+}
 pub trait CommandExecutor {
     fn execute(self, backend: &Backend) -> RespFrame;
 }

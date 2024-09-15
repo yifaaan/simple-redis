@@ -1,6 +1,44 @@
-use crate::resp::{RespArray, RespFrame};
+use std::collections::HashMap;
 
-use super::{extract_args, validate_command, CommandError, HGet, HGetAll, HSet};
+use crate::resp::{RespArray, RespFrame, RespMap, RespNull};
+
+use super::{
+    extract_args, validate_command, CommandError, CommandExecutor, HGet, HGetAll, HSet, RESP_OK,
+};
+
+impl CommandExecutor for HGet {
+    fn execute(self, backend: &crate::backend::Backend) -> RespFrame {
+        match backend.hget(&self.key, &self.field) {
+            Some(value) => value,
+            None => RespFrame::Null(RespNull),
+        }
+    }
+}
+
+impl CommandExecutor for HSet {
+    fn execute(self, backend: &crate::backend::Backend) -> RespFrame {
+        backend.hset(self.key, self.field, self.value);
+        RESP_OK.clone()
+    }
+}
+
+impl CommandExecutor for HGetAll {
+    fn execute(self, backend: &crate::backend::Backend) -> RespFrame {
+        let hmap = backend.hmap.get(&self.key);
+
+        match hmap {
+            Some(hmap) => {
+                let mut map = RespMap(HashMap::new());
+                for v in hmap.iter() {
+                    let key = v.key().to_owned();
+                    map.insert(key, v.value().clone());
+                }
+                map.into()
+            }
+            None => RespArray(vec![]).into(),
+        }
+    }
+}
 
 impl TryFrom<RespArray> for HGet {
     type Error = CommandError;
@@ -57,7 +95,10 @@ impl TryFrom<RespArray> for HSet {
 
 #[cfg(test)]
 mod tests {
-    use crate::resp::{BulkString, RespDecode};
+    use crate::{
+        backend::Backend,
+        resp::{BulkString, RespDecode},
+    };
 
     use super::*;
     use anyhow::Result;
@@ -99,6 +140,48 @@ mod tests {
             RespFrame::BulkString(BulkString("world".into()))
         );
 
+        Ok(())
+    }
+
+    #[test]
+    fn test_hset_hget_hgetall_commands() -> Result<()> {
+        let backend = Backend::default();
+        let cmd = HSet {
+            key: "map".to_string(),
+            field: "hello".to_string(),
+            value: RespFrame::BulkString(BulkString("world".into())),
+        };
+        let result = cmd.execute(&backend);
+        assert_eq!(result, RESP_OK.clone());
+
+        let cmd = HSet {
+            key: "map".to_string(),
+            field: "hello1".to_string(),
+            value: RespFrame::BulkString(BulkString("world1".into())),
+        };
+        cmd.execute(&backend);
+
+        let cmd = HGet {
+            key: "map".to_string(),
+            field: "hello".to_string(),
+        };
+        let result = cmd.execute(&backend);
+        assert_eq!(result, RespFrame::BulkString(BulkString("world".into())));
+
+        let cmd = HGetAll {
+            key: "map".to_string(),
+        };
+        let result = cmd.execute(&backend);
+        let mut expected = RespMap(HashMap::new());
+        expected.insert(
+            "hello".to_string(),
+            RespFrame::BulkString(BulkString("world".into())),
+        );
+        expected.insert(
+            "hello1".to_string(),
+            RespFrame::BulkString(BulkString("world1".into())),
+        );
+        assert_eq!(result, expected.into());
         Ok(())
     }
 }
