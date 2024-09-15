@@ -1,4 +1,4 @@
-use std::{collections::HashMap, path::Prefix};
+use std::collections::HashMap;
 
 use super::{
     BulkString, RespArray, RespDecode, RespError, RespFrame, RespMap, RespNull, RespNullArray,
@@ -76,6 +76,7 @@ impl RespDecode for RespFrame {
                 let frame = RespSet::decode(buf)?;
                 Ok(frame.into())
             }
+            None => Err(RespError::NotComplete),
             _ => Err(RespError::InvalidFrameType(format!(
                 "unknown frame type: {:?}",
                 buf

@@ -1,5 +1,5 @@
 mod decode;
-mod encode;
+pub mod encode;
 
 use bytes::BytesMut;
 use enum_dispatch::enum_dispatch;
